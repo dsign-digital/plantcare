@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1A3A2A"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.yourcompany.plantcare",
