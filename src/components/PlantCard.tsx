@@ -22,13 +22,16 @@ export function PlantCard({ plant, onPress, onWater }: PlantCardProps) {
   const config = STATUS_CONFIG[plant.waterStatus];
   const season = getCurrentSeason();
   const seasonEmoji = getSeasonEmoji(season);
+  const imageUrl = typeof plant.image_url === 'string' ? plant.image_url.trim() : '';
+  const hasImage = imageUrl.length > 0;
+  console.log('PlantCard image_url:', plant.image_url);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       {/* Plant image */}
       <View style={styles.imageContainer}>
-        {plant.image_url ? (
-          <Image source={{ uri: plant.image_url }} style={styles.image} resizeMode="cover" />
+        {hasImage ? (
+          <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={styles.imagePlaceholder}>
             <Text style={styles.imagePlaceholderEmoji}>🪴</Text>

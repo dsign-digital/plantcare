@@ -23,6 +23,8 @@ export default function PlantDetailScreen() {
 
   const plant = plants.find(p => p.id === id);
   const season = getCurrentSeason();
+  const imageUrl = typeof plant?.image_url === 'string' ? plant.image_url.trim() : '';
+  const hasImage = imageUrl.length > 0;
 
   useEffect(() => {
     if (id) {
@@ -80,8 +82,8 @@ export default function PlantDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero image */}
         <View style={styles.hero}>
-          {plant.image_url ? (
-            <Image source={{ uri: plant.image_url }} style={styles.heroImage} resizeMode="cover" />
+          {hasImage ? (
+            <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
           ) : (
             <View style={styles.heroPlaceholder}>
               <Text style={styles.heroEmoji}>🪴</Text>

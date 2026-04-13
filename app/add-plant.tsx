@@ -163,6 +163,7 @@ export default function AddPlantScreen() {
     const interval = parseInt(wateringInterval) || 7;
     const amount = parseInt(waterAmount) || 200;
     const nextWatering = addDays(new Date(), interval);
+    console.log('Calling addPlant with imageUrl:', imageUrl);
 
     const err = await addPlant({
       name: plantName.trim(),
