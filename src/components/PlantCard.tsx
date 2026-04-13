@@ -19,6 +19,7 @@ const STATUS_CONFIG = {
 };
 
 export function PlantCard({ plant, onPress, onWater }: PlantCardProps) {
+  console.log(plant.name, plant.image_url);
   const config = STATUS_CONFIG[plant.waterStatus];
   const season = getCurrentSeason();
   const seasonEmoji = getSeasonEmoji(season);
