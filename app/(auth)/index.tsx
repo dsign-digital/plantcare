@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   },
 
   features: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radii.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   featureEmoji: { fontSize: 20 },
   featureText: {
     fontSize: Typography.sizes.base,
-    color: Colors.white,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
 
