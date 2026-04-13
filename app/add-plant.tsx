@@ -138,9 +138,12 @@ export default function AddPlantScreen() {
         const path = `${profile.id}/${Date.now()}.${ext}`;
         const response = await fetch(imageUri);
         const blob = await response.blob();
-        const { data } = await supabase.storage
+        const { data, error } = await supabase.storage
           .from('plant-images')
           .upload(path, blob, { contentType: `image/${ext}` });
+        if (error) {
+          console.warn('Supabase image upload error:', error.message);
+        }
         if (data) {
           const { data: urlData } = supabase.storage.from('plant-images').getPublicUrl(data.path);
           imageUrl = urlData.publicUrl;
@@ -148,6 +151,10 @@ export default function AddPlantScreen() {
       } catch (e) {
         console.warn('Image upload failed:', e);
       }
+      if (!imageUrl) {
+        imageUrl = imageUri;
+      }
+      console.log('handleSave image URL:', imageUrl);
     }
 
     const interval = parseInt(wateringInterval) || 7;
@@ -183,6 +190,7 @@ export default function AddPlantScreen() {
       return;
     }
     await fetchPlants();
+    await new Promise(resolve => setTimeout(resolve, 500));
     router.back();
   }
 

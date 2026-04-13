@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { usePlants } from '../../src/hooks/usePlants';
 import { Colors, Typography, Spacing, Radii, Shadows } from '../../src/constants/theme';
@@ -51,6 +51,12 @@ export default function HomeScreen() {
       router.push('/add-plant');
     }
   }
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPlants();
+    }, [fetchPlants])
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
