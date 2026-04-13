@@ -20,7 +20,7 @@ const ROOMS = ['Stue', 'Soveværelse', 'Køkken', 'Badeværelse', 'Kontor', 'Alt
 
 export default function AddPlantScreen() {
   const { profile, refreshProfile } = useAuth();
-  const { addPlant } = usePlants();
+  const { addPlant, fetchPlants } = usePlants();
 
   const [step, setStep] = useState<Step>('choose');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -182,6 +182,7 @@ export default function AddPlantScreen() {
       Alert.alert('Fejl', err);
       return;
     }
+    await fetchPlants();
     router.back();
   }
 
