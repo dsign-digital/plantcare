@@ -26,12 +26,13 @@ export function PlantCard({ plant, onPress, onWater }: PlantCardProps) {
   const imageUrl = typeof plant.image_url === 'string' ? plant.image_url.trim() : '';
   const hasImage = imageUrl.length > 0;
   console.log('PlantCard image_url:', plant.image_url);
+  console.log('PlantCard hasImage:', hasImage);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       {/* Plant image */}
       <View style={styles.imageContainer}>
-        {hasImage ? (
+        {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={styles.imagePlaceholder}>
