@@ -134,14 +134,18 @@ export default function AddPlantScreen() {
     let imageUrl: string | null = null;
     if (imageUri && profile) {
       try {
-        const ext = imageUri.split('.').pop() ?? 'jpg';
+        const ext = imageUri.split('.').pop()?.toLowerCase() ?? 'jpg';
         const path = `${profile.id}/${Date.now()}.${ext}`;
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
+        const formData = new FormData();
+        formData.append('file', {
+          uri: imageUri,
+          name: `photo.${ext}`,
+          type: `image/${ext}`,
+        } as any);
         console.log('Starting Supabase image upload', { path, contentType: `image/${ext}` });
         const { data, error } = await supabase.storage
           .from('plant-images')
-          .upload(path, blob, { contentType: `image/${ext}` });
+          .upload(path, formData, { contentType: `image/${ext}` });
         console.log('Supabase upload result', { data, error });
         if (error) {
           console.warn('Supabase image upload error:', error.message);
