@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 import { initializePurchases } from '../src/lib/purchases';
-import { requestNotificationPermissions } from '../src/lib/notifications';
+import { handleNotificationAction, requestNotificationPermissions } from '../src/lib/notifications';
 
 function RootLayoutNav() {
   const { session, loading } = useAuth();
@@ -12,6 +13,14 @@ function RootLayoutNav() {
   useEffect(() => {
     initializePurchases();
     requestNotificationPermissions();
+
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleNotificationAction(response);
+    });
+
+    return () => {
+      responseSub.remove();
+    };
   }, []);
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 
 const RC_IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY!;
 const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY!;
+const ENABLE_DEV_PURCHASE_FALLBACK = __DEV__;
 
 export const PREMIUM_ENTITLEMENT = 'premium';
 export const PREMIUM_OFFERING = 'premium_monthly';
@@ -34,7 +35,8 @@ export async function getOfferings(): Promise<PurchasesOffering | null> {
     const offerings = await Purchases.getOfferings();
     return offerings.current ?? offerings.all[PREMIUM_OFFERING] ?? null;
   } catch (error) {
-    console.error('RevenueCat getOfferings error:', error);
+    // In local dev we may not have full App Store Connect wiring yet.
+    console.warn('RevenueCat getOfferings warning:', error);
     return null;
   }
 }
@@ -56,6 +58,20 @@ export async function purchasePremium(packageToPurchase: any): Promise<true | st
     return 'Købet lykkedes ikke. Prøv igen.';
   } catch (error: any) {
     if (error?.userCancelled) return 'Køb annulleret.';
+    const errorMessage = String(error?.message ?? '');
+    const isSimulator = Platform.OS === 'ios';
+    const shouldUseDevFallback =
+      ENABLE_DEV_PURCHASE_FALLBACK &&
+      isSimulator &&
+      (errorMessage.includes('The receipt is not valid') ||
+        errorMessage.includes('The specified API Key is not recognized'));
+
+    if (shouldUseDevFallback) {
+      console.warn('RevenueCat dev fallback active: simulating premium purchase');
+      await setDevPremiumStatus();
+      return true;
+    }
+
     return error?.message ?? 'Ukendt fejl ved køb.';
   }
 }
@@ -71,7 +87,21 @@ export async function restorePurchases(): Promise<boolean> {
       await syncPremiumStatus(customerInfo);
     }
     return isPremium;
-  } catch (error) {
+  } catch (error: any) {
+    const errorMessage = String(error?.message ?? '');
+    const isSimulator = Platform.OS === 'ios';
+    const shouldUseDevFallback =
+      ENABLE_DEV_PURCHASE_FALLBACK &&
+      isSimulator &&
+      (errorMessage.includes('The receipt is not valid') ||
+        errorMessage.includes('The specified API Key is not recognized'));
+
+    if (shouldUseDevFallback) {
+      console.warn('RevenueCat dev fallback active: simulating restore purchase');
+      await setDevPremiumStatus();
+      return true;
+    }
+
     console.error('Restore purchases error:', error);
     return false;
   }
@@ -125,4 +155,26 @@ export async function logOutPurchases(): Promise<void> {
   } catch {
     // Ignore errors on logout
   }
+}
+
+export async function activateDevPremiumForTesting(): Promise<void> {
+  if (!ENABLE_DEV_PURCHASE_FALLBACK) return;
+  await setDevPremiumStatus();
+}
+
+async function setDevPremiumStatus(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const premiumExpiresAt = new Date();
+  premiumExpiresAt.setFullYear(premiumExpiresAt.getFullYear() + 1);
+
+  await supabase
+    .from('profiles')
+    .update({
+      is_premium: true,
+      premium_expires_at: premiumExpiresAt.toISOString(),
+      revenuecat_customer_id: 'dev-simulated',
+    })
+    .eq('id', user.id);
 }

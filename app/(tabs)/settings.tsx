@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Alert, Switch,
+  TouchableOpacity, Alert, Switch, Linking, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -69,6 +69,19 @@ export default function SettingsScreen() {
     } else {
       Alert.alert('Ingen køb fundet', 'Vi fandt ingen aktive abonnementer at gendanne.');
     }
+  }
+
+  async function handleManageSubscription() {
+    const url = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/account/subscriptions'
+      : 'https://play.google.com/store/account/subscriptions';
+
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Kunne ikke åbne', 'Åbn App Store/Google Play og administrer dit abonnement derfra.');
+      return;
+    }
+    await Linking.openURL(url);
   }
 
   return (
@@ -177,6 +190,15 @@ export default function SettingsScreen() {
               <Text style={styles.actionArrow}>→</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
+            {isPremium && (
+              <>
+                <TouchableOpacity style={styles.actionRow} onPress={handleManageSubscription}>
+                  <Text style={styles.actionText}>Administrer/opsig abonnement</Text>
+                  <Text style={styles.actionArrow}>→</Text>
+                </TouchableOpacity>
+                <View style={styles.divider} />
+              </>
+            )}
             <TouchableOpacity style={styles.actionRow} onPress={handleSignOut}>
               <Text style={styles.actionText}>Log ud</Text>
               <Text style={styles.actionArrow}>→</Text>

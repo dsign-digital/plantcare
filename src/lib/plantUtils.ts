@@ -1,4 +1,4 @@
-import { differenceInDays, addDays, isToday, isTomorrow, isPast } from 'date-fns';
+import { differenceInDays, differenceInMinutes, addDays, isToday, isTomorrow, isPast } from 'date-fns';
 import { Season, Plant, PlantWithStatus, WaterStatus } from '../types/database';
 
 /**
@@ -49,6 +49,15 @@ export function calculateNextWatering(plant: Plant): Date {
 export function getWaterStatus(plant: Plant): WaterStatus {
   const nextDate = new Date(plant.next_watering_at);
   const now = new Date();
+
+  // Immediately after watering, keep plant out of "needs water" bucket.
+  if (plant.last_watered_at) {
+    const lastWatered = new Date(plant.last_watered_at);
+    const minutesSinceWatered = differenceInMinutes(now, lastWatered);
+    if (minutesSinceWatered >= 0 && minutesSinceWatered < 15) {
+      return 'just_watered';
+    }
+  }
 
   if (isPast(nextDate) && !isToday(nextDate)) return 'overdue';
   if (isToday(nextDate)) return 'today';

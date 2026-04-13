@@ -4,7 +4,12 @@ import {
   TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { getOfferings, purchasePremium, restorePurchases } from '../src/lib/purchases';
+import {
+  activateDevPremiumForTesting,
+  getOfferings,
+  purchasePremium,
+  restorePurchases,
+} from '../src/lib/purchases';
 import { useAuth } from '../src/hooks/useAuth';
 import { Colors, Typography, Spacing, Radii, Shadows } from '../src/constants/theme';
 import { Button } from '../src/components/ui';
@@ -37,6 +42,16 @@ export default function PremiumScreen() {
 
   async function handlePurchase() {
     if (!monthlyPackage) {
+      if (__DEV__) {
+        setPurchasing(true);
+        await activateDevPremiumForTesting();
+        setPurchasing(false);
+        await refreshProfile();
+        Alert.alert('🧪 Dev test aktiv', 'Premium er aktiveret lokalt til test.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+        return;
+      }
       Alert.alert('Fejl', 'Abonnement ikke tilgængeligt. Prøv igen senere.');
       return;
     }
