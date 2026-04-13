@@ -8,13 +8,14 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { usePlants } from '../../src/hooks/usePlants';
 import { Colors, Typography, Spacing, Radii, Shadows } from '../../src/constants/theme';
 import { PlantCard } from '../../src/components/PlantCard';
-import { EmptyState, SectionHeader } from '../../src/components/ui';
+import { EmptyState, SectionHeader, Toast } from '../../src/components/ui';
 import { getCurrentSeason, getSeasonLabel, getSeasonEmoji } from '../../src/lib/plantUtils';
 
 export default function HomeScreen() {
   const { profile } = useAuth();
   const { plants, plantsNeedingWater, loading, fetchPlants, waterPlant } = usePlants();
   const [refreshing, setRefreshing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const season = getCurrentSeason();
   const isPremium = profile?.is_premium ?? false;
@@ -37,7 +38,12 @@ export default function HomeScreen() {
           text: 'Ja, vand nu 💧',
           onPress: async () => {
             const err = await waterPlant(plantId);
-            if (err) Alert.alert('Fejl', err);
+            if (err) {
+              Alert.alert('Fejl', err);
+              return;
+            }
+            setToastMessage(`${plantName} er registreret som vandet.`);
+            setTimeout(() => setToastMessage(null), 2200);
           },
         },
       ]
@@ -164,6 +170,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <Toast message={toastMessage} />
     </SafeAreaView>
   );
 }

@@ -133,6 +133,25 @@ export function Badge({ label, color = 'green' }: BadgeProps) {
 }
 
 // ─────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────
+interface ToastProps {
+  message: string | null;
+}
+
+export function Toast({ message }: ToastProps) {
+  if (!message) return null;
+
+  return (
+    <View pointerEvents="none" style={styles.toastWrap}>
+      <View style={styles.toast}>
+        <Text style={styles.toastText}>{message}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────
 // SECTION HEADER
 // ─────────────────────────────────────────
 export function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
@@ -285,4 +304,26 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   emptyAction: { marginTop: Spacing.lg },
+
+  // Toast
+  toastWrap: {
+    position: 'absolute',
+    left: Spacing.base,
+    right: Spacing.base,
+    bottom: Spacing.xl,
+    zIndex: 999,
+  },
+  toast: {
+    backgroundColor: Colors.forest[800],
+    borderRadius: Radii.md,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    ...Shadows.sm,
+  },
+  toastText: {
+    color: Colors.white,
+    fontSize: Typography.sizes.sm,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

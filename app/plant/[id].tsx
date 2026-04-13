@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { da } from 'date-fns/locale';
 import { usePlants } from '../../src/hooks/usePlants';
 import { Colors, Typography, Spacing, Radii, Shadows } from '../../src/constants/theme';
-import { Button } from '../../src/components/ui';
+import { Button, Toast } from '../../src/components/ui';
 import {
   formatWaterAmount, getWaterStatusLabel, getSeasonLabel,
   getCurrentSeason, getSeasonEmoji,
@@ -20,6 +20,7 @@ export default function PlantDetailScreen() {
   const { plants, waterPlant, deletePlant, getWateringHistory } = usePlants();
   const [history, setHistory] = useState<WateringLog[]>([]);
   const [watering, setWatering] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const plant = plants.find(p => p.id === id);
   const season = getCurrentSeason();
@@ -47,7 +48,12 @@ export default function PlantDetailScreen() {
     setWatering(true);
     const err = await waterPlant(plant!.id);
     setWatering(false);
-    if (err) Alert.alert('Fejl', err);
+    if (err) {
+      Alert.alert('Fejl', err);
+      return;
+    }
+    setToastMessage(`${plant!.name} er registreret som vandet.`);
+    setTimeout(() => setToastMessage(null), 2200);
   }
 
   async function handleDelete() {
@@ -222,6 +228,7 @@ export default function PlantDetailScreen() {
           )}
         </View>
       </ScrollView>
+      <Toast message={toastMessage} />
     </SafeAreaView>
   );
 }

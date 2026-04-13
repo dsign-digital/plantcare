@@ -3,7 +3,11 @@ import { supabase } from '../lib/supabase';
 import { Plant, PlantWithStatus } from '../types/database';
 import { enrichPlant, calculateNextWatering } from '../lib/plantUtils';
 import { useAuth } from './useAuth';
-import { schedulePlantNotification, cancelAllNotifications } from '../lib/notifications';
+import {
+  schedulePlantNotification,
+  clearPlantNotifications,
+  dismissAllPresentedNotifications,
+} from '../lib/notifications';
 import { addDays } from 'date-fns';
 
 export function usePlants() {
@@ -77,7 +81,13 @@ export function usePlants() {
     if (!plant) return 'Plante ikke fundet.';
 
     const now = new Date();
-    const nextWatering = addDays(now, plant.seasonalInterval);
+    const nextWatering = addDays(now, Math.max(1, plant.seasonalInterval));
+
+    // Flush delivered notifications first to avoid immediate stale banner replay.
+    await dismissAllPresentedNotifications();
+
+    // Clear notifications for watered plant, including legacy entries without plantId.
+    await clearPlantNotifications(plantId, plant.name);
 
     // Update plant
     const { error: updateError } = await supabase
@@ -100,7 +110,7 @@ export function usePlants() {
 
     await fetchPlants();
 
-    // Reschedule notification
+    // Schedule only the watered plant's next reminder.
     const updatedPlant = { ...plant, next_watering_at: nextWatering.toISOString() };
     await schedulePlantNotification(updatedPlant, profile?.notification_time ?? '08:00');
 
