@@ -96,8 +96,6 @@ export async function identifyPlant(
       },
       body: JSON.stringify({
         images: [base64Image],
-        similar_images: false,
-        plant_language: 'da', // Danish descriptions when available
       }),
     }
     );
