@@ -33,7 +33,13 @@ export function PlantCard({ plant, onPress, onWater }: PlantCardProps) {
       {/* Plant image */}
       <View style={styles.imageContainer}>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            resizeMode="cover"
+            onError={(e) => console.log('Image error:', e.nativeEvent.error)}
+            onLoad={() => console.log('Image loaded!')}
+          />
         ) : (
           <View style={styles.imagePlaceholder}>
             <Text style={styles.imagePlaceholderEmoji}>🪴</Text>
