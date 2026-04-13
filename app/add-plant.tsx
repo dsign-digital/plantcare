@@ -145,7 +145,7 @@ export default function AddPlantScreen() {
         console.log('Supabase upload result', { data, error });
         if (error) {
           console.warn('Supabase image upload error:', error.message);
-          Alert.alert('Uploadfejl', error.message);
+          Alert.alert('Uploadfejl', JSON.stringify(error, null, 2));
         }
         if (data) {
           const { data: urlData } = supabase.storage.from('plant-images').getPublicUrl(data.path);
