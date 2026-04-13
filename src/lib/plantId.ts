@@ -33,7 +33,7 @@ async function imageUriToBase64(uri: string): Promise<string> {
   const blob = await response.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onload = () => {
       const dataUrl = reader.result as string;
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
       resolve(base64);
@@ -81,6 +81,9 @@ export async function identifyPlant(
 ): Promise<PlantIdentification | PlantIdError> {
   try {
     const base64Image = await imageUriToBase64(imageUri);
+    if (!base64Image || base64Image.trim().length < 100) {
+      return { code: 'api_error', message: 'Billeddata er ugyldig eller for kort.' };
+    }
 
     const details = 'common_names,description,watering';
     const response = await fetch(
@@ -104,6 +107,8 @@ export async function identifyPlant(
     }
 
     if (!response.ok) {
+      const responseBody = await response.text();
+      console.error(`Plant.id API error body (${response.status}):`, responseBody);
       return { code: 'api_error', message: `Plant.id API fejl: ${response.status}` };
     }
 
