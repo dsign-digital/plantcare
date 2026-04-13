@@ -34,7 +34,8 @@ async function imageUriToBase64(uri: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64 = (reader.result as string).split(',')[1];
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
       resolve(base64);
     };
     reader.onerror = reject;
@@ -81,24 +82,22 @@ export async function identifyPlant(
   try {
     const base64Image = await imageUriToBase64(imageUri);
 
-    const response = await fetch(`${PLANT_ID_BASE_URL}/identification`, {
+    const details = 'common_names,description,watering';
+    const response = await fetch(
+      `${PLANT_ID_BASE_URL}/identification?details=${encodeURIComponent(details)}`,
+      {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Api-Key': PLANT_ID_API_KEY,
       },
       body: JSON.stringify({
-        images: [`data:image/jpeg;base64,${base64Image}`],
+        images: [base64Image],
         similar_images: false,
-        plant_details: [
-          'common_names',
-          'description',
-          'watering',
-          'best_watering',
-        ],
         plant_language: 'da', // Danish descriptions when available
       }),
-    });
+    }
+    );
 
     if (response.status === 429) {
       return { code: 'limit_exceeded', message: 'Du har nået din månedlige grænse for scanninger.' };
