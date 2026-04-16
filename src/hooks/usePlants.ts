@@ -106,6 +106,7 @@ export function usePlants() {
       user_id: user.id,
       watered_at: now.toISOString(),
       water_amount_ml: amountMl ?? plant.water_amount_ml,
+      notes: null,
     });
 
     await fetchPlants();
@@ -118,9 +119,34 @@ export function usePlants() {
   }
 
   /**
+   * Postpone next watering reminder by N days.
+   */
+  async function postponeWatering(plantId: string, days: number = 1): Promise<string | null> {
+    const plant = plants.find((p) => p.id === plantId);
+    if (!plant) return 'Plante ikke fundet.';
+
+    const baseDate = new Date(plant.next_watering_at);
+    if (Number.isNaN(baseDate.getTime())) return 'Ugyldig vandingsdato.';
+    const nextWatering = addDays(baseDate, Math.max(1, days));
+
+    const { error } = await supabase
+      .from('plants')
+      .update({ next_watering_at: nextWatering.toISOString() })
+      .eq('id', plantId);
+    if (error) return error.message;
+
+    await fetchPlants();
+    await schedulePlantNotification({ ...plant, next_watering_at: nextWatering.toISOString() }, profile?.notification_time ?? '08:00');
+    return null;
+  }
+
+  /**
    * Update a plant
    */
-  async function updatePlant(plantId: string, updates: Partial<Plant>): Promise<string | null> {
+  async function updatePlant(
+    plantId: string,
+    updates: Partial<Omit<Plant, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+  ): Promise<string | null> {
     const { error } = await supabase
       .from('plants')
       .update(updates)
@@ -171,6 +197,7 @@ export function usePlants() {
     fetchPlants,
     addPlant,
     waterPlant,
+    postponeWatering,
     updatePlant,
     deletePlant,
     getWateringHistory,

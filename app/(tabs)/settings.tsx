@@ -8,7 +8,11 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { usePlants } from '../../src/hooks/usePlants';
 import { Colors, Typography, Spacing, Radii, Shadows } from '../../src/constants/theme';
 import { remainingScans, getCurrentSeason, getSeasonLabel, getSeasonEmoji } from '../../src/lib/plantUtils';
-import { rescheduleAllNotifications } from '../../src/lib/notifications';
+import {
+  requestNotificationPermissions,
+  rescheduleAllNotifications,
+  scheduleTestNotification,
+} from '../../src/lib/notifications';
 import { restorePurchases } from '../../src/lib/purchases';
 
 const NOTIFICATION_TIMES = ['07:00', '08:00', '09:00', '18:00', '19:00', '20:00'];
@@ -82,6 +86,29 @@ export default function SettingsScreen() {
       return;
     }
     await Linking.openURL(url);
+  }
+
+  async function handleTestNotification() {
+    if (!plants.length) {
+      Alert.alert('Ingen planter', 'Tilføj mindst én plante for at sende en test-notifikation.');
+      return;
+    }
+
+    const granted = await requestNotificationPermissions();
+    if (!granted) {
+      Alert.alert('Notifikationer ikke tilladt', 'Giv appen tilladelse til notifikationer i telefonens indstillinger.');
+      return;
+    }
+
+    const firstPlant = plants[0];
+    const notificationId = await scheduleTestNotification(firstPlant, 8);
+    if (!notificationId) {
+      Alert.alert('Fejl', 'Kunne ikke sende test-notifikation lige nu.');
+      return;
+    }
+
+    const placement = firstPlant.room?.trim() ? ` - ${firstPlant.room.trim()}` : '';
+    Alert.alert('✅ Test sendt', `Du får en notifikation om ca. 8 sekunder for ${firstPlant.name}${placement}.`);
   }
 
   return (
@@ -172,6 +199,9 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            <TouchableOpacity style={styles.testNotificationBtn} onPress={handleTestNotification}>
+              <Text style={styles.testNotificationBtnText}>Send test-notifikation (snooze)</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -360,6 +390,18 @@ const styles = StyleSheet.create({
     color: Colors.stone[600],
   },
   timeChipTextActive: { color: Colors.white },
+  testNotificationBtn: {
+    marginTop: Spacing.md,
+    backgroundColor: Colors.forest[600],
+    borderRadius: Radii.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  testNotificationBtnText: {
+    color: Colors.white,
+    fontSize: Typography.sizes.sm,
+    fontWeight: '700',
+  },
 
   actionRow: {
     flexDirection: 'row',

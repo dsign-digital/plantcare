@@ -2,12 +2,14 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { Plant } from '../types/database';
-import { getSeasonalInterval } from './plantUtils';
+import { getCurrentSeason, getSeasonEmoji, getSeasonLabel, getSeasonalInterval, getSeasonalLightShift } from './plantUtils';
 import { addDays } from 'date-fns';
 import { supabase } from './supabase';
 
 export const WATERING_NOTIFICATION_CATEGORY_ID = 'watering-reminder';
 export const WATER_NOW_ACTION_ID = 'water-now';
+export const SNOOZE_2H_ACTION_ID = 'snooze-2h';
+export const SNOOZE_TOMORROW_ACTION_ID = 'snooze-tomorrow';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -18,6 +20,28 @@ Notifications.setNotificationHandler({
     shouldSetBadge: true,
   }),
 });
+
+function getPlantNotificationLabel(plant: Pick<Plant, 'name' | 'room'>): string {
+  const roomText = plant.room?.trim() ? ` - ${plant.room.trim()}` : '';
+  return `${plant.name}${roomText}`;
+}
+
+function getWateringNotificationContent(
+  plant: Pick<Plant, 'id' | 'name' | 'room'>,
+  bodyPrefix: string
+): { title: string; body: string; data: Record<string, string> } {
+  const label = getPlantNotificationLabel(plant);
+  return {
+    title: `${label} skal vandes 💧`,
+    body: `${bodyPrefix} ${label}`,
+    data: {
+      plantId: plant.id,
+      plantName: plant.name,
+      plantRoom: plant.room ?? '',
+      plantLabel: label,
+    },
+  };
+}
 
 /**
  * Request notification permissions
@@ -42,6 +66,14 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       {
         identifier: WATER_NOW_ACTION_ID,
         buttonTitle: '💧 Vandet nu',
+      },
+      {
+        identifier: SNOOZE_2H_ACTION_ID,
+        buttonTitle: '⏰ Om 2 timer',
+      },
+      {
+        identifier: SNOOZE_TOMORROW_ACTION_ID,
+        buttonTitle: '📅 I morgen',
       },
     ]
   );
@@ -99,9 +131,7 @@ export async function schedulePlantNotification(
 
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
-        title: `${plant.name} skal vandes 💧`,
-        body: `Husk at vande din ${plant.name} i dag`,
-        data: { plantId: plant.id, plantName: plant.name },
+        ...getWateringNotificationContent(plant, 'Husk at vande'),
         categoryIdentifier: WATERING_NOTIFICATION_CATEGORY_ID,
         sound: 'default',
       },
@@ -119,16 +149,13 @@ export async function schedulePlantNotification(
  * Handles notification action taps (e.g. "Vandet nu")
  */
 export async function handleNotificationAction(response: Notifications.NotificationResponse): Promise<void> {
-  if (response.actionIdentifier !== WATER_NOW_ACTION_ID) return;
-
   await Notifications.dismissNotificationAsync(response.notification.request.identifier);
 
+  const actionId = response.actionIdentifier;
   const plantId = String(response.notification.request.content.data?.plantId ?? '');
   if (!plantId) return;
-  await clearPlantNotifications(
-    plantId,
-    String(response.notification.request.content.data?.plantName ?? '')
-  );
+  const plantNameFromData = String(response.notification.request.content.data?.plantName ?? '');
+  await clearPlantNotifications(plantId, plantNameFromData);
 
   const { data: plant, error: plantError } = await supabase
     .from('plants')
@@ -140,6 +167,23 @@ export async function handleNotificationAction(response: Notifications.Notificat
     console.warn('Notification water action failed: plant not found', plantError?.message);
     return;
   }
+
+  if (actionId === SNOOZE_2H_ACTION_ID) {
+    await scheduleSnoozeNotification(plant, 2);
+    return;
+  }
+
+  if (actionId === SNOOZE_TOMORROW_ACTION_ID) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('notification_time')
+      .eq('id', plant.user_id)
+      .single();
+    await scheduleTomorrowSnoozeNotification(plant, profile?.notification_time ?? '08:00');
+    return;
+  }
+
+  if (actionId !== WATER_NOW_ACTION_ID) return;
 
   const now = new Date();
   const nextWatering = addDays(now, Math.max(1, getSeasonalInterval(plant)));
@@ -162,6 +206,7 @@ export async function handleNotificationAction(response: Notifications.Notificat
     user_id: plant.user_id,
     watered_at: now.toISOString(),
     water_amount_ml: plant.water_amount_ml,
+    notes: null,
   });
 
   const { data: profile } = await supabase
@@ -178,6 +223,60 @@ export async function handleNotificationAction(response: Notifications.Notificat
 
   await clearPlantNotifications(plant.id, plant.name);
   await schedulePlantNotification(updatedPlant, profile?.notification_time ?? '08:00');
+}
+
+async function scheduleSnoozeNotification(plant: Plant, hours: number): Promise<void> {
+  const seconds = Math.max(60, Math.round(hours * 60 * 60));
+  const trigger: Notifications.NotificationTriggerInput =
+    Platform.OS === 'android'
+      ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, channelId: 'watering' }
+      : { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds };
+
+  const content = getWateringNotificationContent(plant, 'Snooze er slut - husk at vande');
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      ...content,
+      data: {
+        ...content.data,
+        type: 'watering-snooze',
+      },
+      categoryIdentifier: WATERING_NOTIFICATION_CATEGORY_ID,
+      sound: 'default',
+    },
+    trigger,
+  });
+}
+
+async function scheduleTomorrowSnoozeNotification(plant: Plant, notificationTime: string): Promise<void> {
+  const [rawHours, rawMinutes] = String(notificationTime).split(':');
+  const parsedHours = Number(rawHours);
+  const parsedMinutes = Number(rawMinutes);
+  const hours = Number.isInteger(parsedHours) && parsedHours >= 0 && parsedHours <= 23 ? parsedHours : 8;
+  const minutes = Number.isInteger(parsedMinutes) && parsedMinutes >= 0 && parsedMinutes <= 59 ? parsedMinutes : 0;
+
+  const now = new Date();
+  const tomorrow = addDays(now, 1);
+  tomorrow.setHours(hours, minutes, 0, 0);
+
+  const seconds = Math.max(60, Math.ceil((tomorrow.getTime() - now.getTime()) / 1000));
+  const trigger: Notifications.NotificationTriggerInput =
+    Platform.OS === 'android'
+      ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, channelId: 'watering' }
+      : { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds };
+
+  const content = getWateringNotificationContent(plant, 'Snooze til i morgen er slut - tid til at vande');
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      ...content,
+      data: {
+        ...content.data,
+        type: 'watering-snooze',
+      },
+      categoryIdentifier: WATERING_NOTIFICATION_CATEGORY_ID,
+      sound: 'default',
+    },
+    trigger,
+  });
 }
 
 /**
@@ -316,4 +415,96 @@ export async function rescheduleAllNotifications(
  */
 export async function getPendingNotifications() {
   return Notifications.getAllScheduledNotificationsAsync();
+}
+
+/**
+ * Schedules a short-delay test notification with the same snooze actions
+ * used for regular watering reminders.
+ */
+export async function scheduleTestNotification(
+  plant: Pick<Plant, 'id' | 'name' | 'room'>,
+  delaySeconds: number = 8
+): Promise<string | null> {
+  try {
+    const seconds = Math.max(5, Math.round(delaySeconds));
+    const trigger: Notifications.NotificationTriggerInput =
+      Platform.OS === 'android'
+        ? {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds,
+            channelId: 'watering',
+          }
+        : { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds };
+
+    const content = getWateringNotificationContent(plant, 'Test-notifikation: prøv gerne snooze-knapperne for');
+    const identifier = await Notifications.scheduleNotificationAsync({
+      content: {
+        ...content,
+        data: {
+          ...content.data,
+          type: 'watering-test',
+        },
+        categoryIdentifier: WATERING_NOTIFICATION_CATEGORY_ID,
+        sound: 'default',
+      },
+      trigger,
+    });
+
+    return identifier;
+  } catch (error) {
+    console.error('Schedule test notification error:', error);
+    return null;
+  }
+}
+
+/**
+ * Checks if daylight season shift is large enough to nudge user about plant placement.
+ * Designed as low-noise: cooldown and threshold are conservative.
+ */
+export async function checkSeasonalLightNudges(plants: Plant[]): Promise<void> {
+  if (!plants.length) return;
+
+  const now = new Date();
+  const currentSeason = getCurrentSeason();
+
+  for (const plant of plants) {
+    if (!plant.baseline_light_score || !plant.baseline_light_season || !plant.baseline_light_recorded_at) {
+      continue;
+    }
+
+    const shift = getSeasonalLightShift(plant);
+    const shouldNudge = Math.abs(shift) >= 0.18;
+    if (!shouldNudge) continue;
+
+    const lastNudgeAt = plant.last_light_nudge_at ? new Date(plant.last_light_nudge_at) : null;
+    const withinCooldown =
+      !!lastNudgeAt &&
+      now.getTime() - lastNudgeAt.getTime() < 1000 * 60 * 60 * 24 * 21;
+    if (withinCooldown) continue;
+
+    const directionText = shift < 0 ? 'mindre dagslys' : 'mere dagslys';
+    const placementHint = shift < 0
+      ? 'Overvej at flytte planten tættere på vinduet.'
+      : 'Hold øje med direkte sol og flyt lidt væk ved bladskader.';
+
+    const trigger: Notifications.NotificationTriggerInput =
+      Platform.OS === 'android'
+        ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 5, channelId: 'watering' }
+        : { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 5 };
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${plant.name}: Lysforhold ændret ${getSeasonEmoji(currentSeason)}`,
+        body: `${getSeasonLabel(currentSeason)} giver ${directionText}. ${placementHint}`,
+        data: { plantId: plant.id, type: 'light-season-nudge' },
+        sound: 'default',
+      },
+      trigger,
+    });
+
+    await supabase
+      .from('plants')
+      .update({ last_light_nudge_at: now.toISOString() })
+      .eq('id', plant.id);
+  }
 }
